@@ -1,17 +1,26 @@
+import contextlib
+import json
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
-
+from sqlalchemy import MetaData
+from datetime import datetime, timedelta
 
 Base = automap_base()
 
-engine = create_engine(
-    "postgresql://postgres@localhost:5432/dw", echo=True, future=True
-)
+# Basic configuration
+config = json.load(open('config.json'))
+limpiar_db = False if 'limpiar_db' not in config else config['limpiar_db']
+db = 'dw' if 'db' not in config else config['db']
+usuario_db = 'postgres' if 'usuario_db' not in config else config['usuario_db']
+password = False if 'password' not in config else config['password']
+
+connection_string = f"postgresql://{usuario_db}@localhost:5432/{db}" if not password else f"postgresql+psycopg2://{usuario_db}:{password}@localhost:5432/{db}"
+
+engine = create_engine(connection_string, echo=True, future=True)
 
 # reflect the tables
 Base.prepare(autoload_with=engine)
-
 
 # mapped classes are now created with names by default
 # matching that of the table name.
@@ -27,16 +36,52 @@ Trade = Base.classes.trades
 
 
 def main():
+    ref_data = json.load(open('ref_data.json'))
+
+    if limpiar_db:
+        limpiar_db()
+
     with Session(engine) as session:
-        tiempo = crear_tiempo()
-        ordenes = crear_ordenes(tiempo)
-        trades = crear_trades(ordenes)
+        ref_data_entities = crear_ref_data(ref_data)
+        tiempo = []  # crear_tiempo()
+        ordenes = []  # crear_ordenes(tiempo)
+        trades = []  # crear_trades(ordenes)
 
-        session.add_all(tiempo)
-        session.add_all(ordenes)
-        session.add_all(trades)
-
+        session.add_all(ref_data_entities + tiempo + ordenes + trades)
         session.commit()
+
+
+def limpiar_db():
+    with contextlib.closing(engine.connect()) as con:
+        trans = con.begin()
+        for table in reversed(Base.metadata.sorted_tables):
+            con.execute(table.delete())
+        trans.commit()
+
+
+def adaptar_instrumentos(p):
+    p["vencimiento"] = datetime.strptime(p["vencimiento"], '%Y-%m')
+    p["intervalo_settlement"] = timedelta(minutes=p["intervalo_settlement"])
+    return p
+
+
+def entity_factory(entity):
+    return {
+        "brokers": lambda p: Broker(**p),
+        "firmas": lambda p: Firma(**p),
+        "operadores": lambda p: Operador(**p),
+        "cuentas": lambda p: Cuenta(**p),
+        "instrumentos": lambda p: Instrumento(**adaptar_instrumentos(p)),
+    }[entity]
+
+
+def crear_ref_data(ref_data):
+    entities = []
+
+    for entity, values in ref_data.items():
+        entities += [entity_factory(entity)(params) for params in values]
+
+    return entities
 
 
 def crear_tiempo():

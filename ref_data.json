@@ -1,0 +1,41 @@
+{
+  "brokers": [
+      {"id": 1, "nombre": "Broker A"},
+      {"id": 2, "nombre": "Broker B"},
+      {"id": 3, "nombre": "Broker C"}
+   ],
+  "firmas": [
+      {"id": 1, "nombre": "Firma A"},
+      {"id": 2, "nombre": "Firma B"},
+      {"id": 3, "nombre": "Firma C"}
+   ],
+  "operadores": [
+      {"id": 1, "nombre": "Operador A"},
+      {"id": 2, "nombre": "Operador B"},
+      {"id": 3, "nombre": "Operador C"}
+   ],
+  "cuentas": [
+      {"id":  1, "id_firma": 1, "id_broker": 1, "nombre":  "Cuenta A1"},
+      {"id":  2, "id_firma": 1, "id_broker": 1, "nombre":  "Cuenta A2"},
+      {"id":  3, "id_firma": 1, "id_broker": 2, "nombre":  "Cuenta A3"},
+      {"id":  4, "id_firma": 2, "id_broker": 2, "nombre":  "Cuenta B1"},
+      {"id":  5, "id_firma": 2, "id_broker": 3, "nombre":  "Cuenta B2"},
+      {"id":  6, "id_firma": 2, "id_broker": 1, "nombre":  "Cuenta B3"},
+      {"id":  7, "id_firma": 3, "id_broker": 3, "nombre":  "Cuenta C1"},
+      {"id":  8, "id_firma": 3, "id_broker": 3, "nombre":  "Cuenta C2"},
+      {"id":  9, "id_firma": 3, "id_broker": 2, "nombre":  "Cuenta C3"}
+  ],
+  "instrumentos": [
+      {"ticker": "SOY.F.09", "nombre_producto": "Soja", "tipo_producto": "Commodity", "tipo_derivado": "futuro", "vencimiento": "2022-09", "precio_ejercicio": null, "intervalo_settlement": 15},
+      {"ticker": "SOY.P.09.100", "nombre_producto": "Soja", "tipo_producto": "Commodity", "tipo_derivado": "put", "vencimiento": "2022-09", "precio_ejercicio": 100, "intervalo_settlement": 20},
+      {"ticker": "SOY.P.09.150", "nombre_producto": "Soja", "tipo_producto": "Commodity", "tipo_derivado": "call", "vencimiento": "2022-09", "precio_ejercicio": 150, "intervalo_settlement": 17},
+      {"ticker": "SOY.C.09.120", "nombre_producto": "Soja", "tipo_producto": "Commodity", "tipo_derivado": "call", "vencimiento": "2022-09", "precio_ejercicio": 120, "intervalo_settlement": 20},
+      {"ticker": "SOY.F.12", "nombre_producto": "Soja", "tipo_producto": "Commodity", "tipo_derivado": "futuro", "vencimiento": "2022-12", "precio_ejercicio": null, "intervalo_settlement": 10},
+      {"ticker": "USD.F.09", "nombre_producto": "Dolar", "tipo_producto": "Moneda", "tipo_derivado": "futuro", "vencimiento": "2022-09", "precio_ejercicio": null, "intervalo_settlement": 12},
+      {"ticker": "USD.F.12", "nombre_producto": "Dolar", "tipo_producto": "Moneda", "tipo_derivado": "futuro", "vencimiento": "2022-12", "precio_ejercicio": null, "intervalo_settlement": 15},
+      {"ticker": "USD.P.12.350", "nombre_producto": "Dolar", "tipo_producto": "Moneda", "tipo_derivado": "put", "vencimiento": "2022-12", "precio_ejercicio": 350, "intervalo_settlement": 13},
+      {"ticker": "USD.P.12.370", "nombre_producto": "Dolar", "tipo_producto": "Moneda", "tipo_derivado": "put", "vencimiento": "2022-12", "precio_ejercicio": 370, "intervalo_settlement": 13},
+      {"ticker": "USD.C.12.330", "nombre_producto": "Dolar", "tipo_producto": "Moneda", "tipo_derivado": "call", "vencimiento": "2022-12", "precio_ejercicio": 330, "intervalo_settlement": 11},
+      {"ticker": "USD.C.12.350", "nombre_producto": "Dolar", "tipo_producto": "Moneda", "tipo_derivado": "call", "vencimiento": "2022-12", "precio_ejercicio": 350, "intervalo_settlement": 11}
+  ]
+}

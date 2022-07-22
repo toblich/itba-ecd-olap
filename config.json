@@ -1,0 +1,6 @@
+{
+  "limpiar_db": true,
+  "db": "dw",
+  "usuario_db": "postgres",
+  "password": false
+}
