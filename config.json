@@ -2,7 +2,7 @@
   "limpiar_db": true,
   "db": "dw",
   "usuario_db": "postgres",
-  "password": false,
+  "password": "postgres",
   "fecha_desde": "19-07-2022",
   "fecha_hasta": "22-07-2022",
   "hora_apertura": 8,
