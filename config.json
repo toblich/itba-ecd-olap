@@ -2,5 +2,16 @@
   "limpiar_db": true,
   "db": "dw",
   "usuario_db": "postgres",
-  "password": false
+  "password": false,
+  "fecha_desde": "19-07-2022",
+  "fecha_hasta": "22-07-2022",
+  "hora_apertura": 8,
+  "hora_cierre": 17,
+  "ordenes_por_hora": 100,
+  "precio_base_compra": 10,
+  "var_precio_compra": 1,
+  "precio_base_venta": 12,
+  "var_precio_venta": 1,
+  "volumen_base": 100,
+  "var_volumen": 20
 }

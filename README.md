@@ -17,6 +17,17 @@ Antes de poblar los datos en la DB, los siguientes valores deben ser configurado
 * db => Nombre de la base de datos postgres (por defecto "dw")
 * usuario_db => Nombre del usuario de la base de datos (por defecto "postgres")
 * password => Password del usuario de la db. Si es false (defecto), se intentará una conexión sin password.
+* fecha_desde => Fecha de inicio de la simulación, en formato dd-mm-yyyy
+* fecha_hasta => Fecha de fin de la simulación, en formato dd-mm-yyyy
+* hora_apertura => Hora de apertura del mercado, cada día
+* hora_cierre => Hora de cierre del mercado, cada día
+* ordenes_por_hora => Cantidad de órdenes a generar por hora
+* precio_base_compra => Media del precio de compra (distribución normal)
+* var_precio_compra => Desvío estándar del precio de compra (distribución normal)
+* precio_base_venta => Media del precio de venta (distribución normal)
+* var_precio_venta => Desvío estándar del precio de venta (distribución normal)
+* volumen_base => Media del volumen (cantida de contratos) por órden (distribución normal)
+* var_volumen => Desvío estándar de la cantidad de contratos por órden (distribución normal)
 
 ## Cómo poblar datos del DW
 
