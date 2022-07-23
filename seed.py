@@ -141,7 +141,7 @@ def crear_fechas(fechas):
 
 def crear_tiempos(tiempos):
     return [Tiempo(
-        nano_epoch=round((t.timestamp() + t.microsecond * 1000) * 1e6),
+        nano_epoch=round(t.timestamp() * 1e9),
         dia_epoch=t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp(),
         nanosegundos=t.microsecond * 1000,
         segundo=t.second,

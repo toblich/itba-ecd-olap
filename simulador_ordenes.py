@@ -78,7 +78,7 @@ class SimuladorOrdenes:
             orden = {
                 "id": self.id_actual,
                 "ticker": tickers[i],
-                "timestamp_creacion": round((tiempos[i].timestamp() + tiempos[i].microsecond * 1000) * 1e6),
+                "timestamp_creacion": round(tiempos[i].timestamp() * 1e9),
                 "timestamp_cierre": None,
                 "id_cuenta": cuentas[i],
                 "id_operador": operadores[i],
