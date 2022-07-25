@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
+from calculador_trades import CalculadorTrades
 from simulador_ordenes import SimuladorOrdenes
 
 Base = automap_base()
@@ -50,7 +51,7 @@ def main():
     with Session(engine) as session:
         ref_data_entities = crear_ref_data(ref_data)
         ordenes, fechas, tiempos = crear_ordenes(ref_data)
-        trades = []  # crear_trades(ordenes)
+        trades = crear_trades(ordenes, ref_data)
 
         session.add_all(ref_data_entities + fechas + tiempos + ordenes + trades)
         session.commit()
@@ -150,72 +151,14 @@ def crear_tiempos(tiempos):
     ) for t in tiempos]
 
 
-def crear_trades(ordenes):
-    # # Divido Ventas y Compras
-    # Ventas = ordenes[lado="venta"]
-    # Compras = ordenes[lado="compra"]
+def crear_trades(ordenes, ref_data):
+    hora_apertura = 8 if 'hora_apertura' not in config else config["hora_apertura"]
+    hora_cierre = 17 if 'hora_cierre' not in config else config["hora_cierre"]
+    instrumentos = ref_data["instrumentos"]
 
-    # # Inicializo algunas variables, seguramente acá me falten más
-    # Trade.id=0
-
-    # For compra in Compras
-    # For venta in Ventas
-
-
-    # # Como las tablas están ordenadas por timestamp, debería ir matcheando contra lo primero que puede, tipo FIFO
-    # # Caso precio venta <= precio compra y que me alcancen la cantidad a vender
-    # If venta.ticker == compra.ticker and venta.precio_limit <= compra.precio adn venta.cantidad_contratos >= compra.cantidad_contratos and venta.cantidad_contratos > 0 and compra.cantidad_contratos > 0 then 
-    # venta.cantidad_contratos = venta.cantidad_contratos-compra.cantidad_contratos
-
-
-    # Trade.id = Trade.id+1
-    # Trade.ticker = ticker
-    # Trade.stamp = max(venta.timestamp_creacion, compra.timestamp_creacion)
-    # Trade.id_orden_compra = compra.id
-    # Trade.id_orden_venta = venta.id
-    # Trade.precio_operado = venta.precio_limit
-    # Trade.volumen_contratos = compra.cantidad_contratos
-    # compra.cantidad_contratos = 0
-    # Trade.es_agresivo = false
-    # Tarde.es_self_match = if compra.id_cuenta==venta.id_cuenta then 1 else 0
-    # # Ver período de settlement como se pone
-    # Trade.periodo_ejecucion = buscar en instrumentos?
-    # # Ver ganancias comprador y vendedor
-    # Trade.ganancia_comprador = buscar precio de último trade del día y restar?
-    # Trade.ganancia_vendedor = Trade.ganancia_comprador
-
-    # # Cambio estados de ordenes
-    # venta.estado = if venta.cantidad_contratos == 0 then "ejecutada" else "parcial"
-    # compra.estado = "ejecutada"
-
-    # else
-    # # Caso precio venta <= precio compra y que no me alcancen la cantidad a vender
-    # If venta.ticker == compra.ticker and venta.precio_limit <= compra.precio adn venta.cantidad_contratos <  compra.cantidad_contratos and venta.cantidad_contratos > 0 and compra.cantidad_contratos > 0 then 
-    # compra.cantidad_contratos=compra.cantidad_contratos-venta.cantidad_contratos
-
-    # Trade.id = Trade.id+1
-    # Trade.ticker = ticker
-    # Trade.stamp = max(venta.timestamp_creacion, compra.timestamp_creacion)
-    # Trade.id_orden_compra = compra.id
-    # Trade.id_orden_venta = venta.id
-    # Trade.precio_operado = venta.precio_limit
-    # Trade.volumen_contratos = venta.cantidad_contratos
-    # venta.cantidad_contratos = 0
-    # Trade.es_agresivo = false
-    # Tarde.es_self_match = if compra.id_cuenta==venta.id_cuenta then 1 else 0
-    # # Ver período de settlement como se pone
-    # Trade.periodo_ejecucion = buscar en instrumentos?
-    # # Ver ganancias comprador y vendedor
-    # Trade.ganancia_comprador = buscar precio de último trade del día y restar?
-    # Trade.ganancia_vendedor = Trade.ganancia_comprador
-
-    # # Cambio estados de ordenes
-    # venta.estado = "ejecutada"
-    # compra.estado = "parcial"
-
-    # end los 2 for
-
-    return []
+    calculador = CalculadorTrades(instrumentos, hora_apertura, hora_cierre)
+    trades = calculador.calcular_trades(ordenes)
+    return [Trade(**t) for t in trades]
 
 
 if __name__ == "__main__":
