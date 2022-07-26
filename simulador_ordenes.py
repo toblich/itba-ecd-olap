@@ -7,6 +7,7 @@ import csv
 
 from progress_bar import ProgressBar
 
+random.seed(7)
 
 class SimuladorOrdenes:
 
