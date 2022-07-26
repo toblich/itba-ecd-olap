@@ -7,6 +7,7 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
 from calculador_trades import CalculadorTrades
+from progress_bar import ProgressBar
 from simulador_ordenes import SimuladorOrdenes
 
 Base = automap_base()
@@ -43,6 +44,8 @@ Meses = {1: 'enero', 2: 'febrero', 3: 'marzo', 4: 'abril', 5: 'mayo', 6: 'junio'
 
 
 def main():
+    print ("--- INICIANDO GENERACION DE DATOS ---")
+
     ref_data = json.load(open('ref_data.json'))
 
     if limpiar_db:
@@ -56,13 +59,17 @@ def main():
         session.add_all(ref_data_entities + fechas + tiempos + ordenes + trades)
         session.commit()
 
+    print("--- GENERACION TERMINADA ---")
+
 
 def limpiar_db():
+    print("Eliminando datos anteriores")
     with contextlib.closing(engine.connect()) as con:
         trans = con.begin()
         for table in reversed(Base.metadata.sorted_tables):
             con.execute(table.delete())
         trans.commit()
+    print("Datos anteriores eliminados")
 
 
 def adaptar_instrumentos(p):
@@ -82,11 +89,13 @@ def entity_factory(entity):
 
 
 def crear_ref_data(ref_data):
+    print("Creando cuentas, firmas, brokers, operadores e instrumentos...", end='')
     entities = []
 
     for entity, values in ref_data.items():
         entities += [entity_factory(entity)(params) for params in values]
 
+    print("LISTO")
     return entities
 
 
@@ -102,6 +111,7 @@ def crear_ordenes(ref_data):
     var_precio_venta = 1 if 'var_precio_venta' not in config else config["var_precio_venta"]
     volumen_base = 100 if 'volumen_base' not in config else config["volumen_base"]
     var_volumen = 20 if 'var_volumen' not in config else config["var_volumen"]
+    ratio_rechazo = 0.02 if 'ratio_rechazo' not in config else config["ratio_rechazo"]
 
     fecha_desde = datetime.strptime(fecha_desde, '%d-%m-%Y')
     fecha_hasta = datetime.strptime(fecha_hasta, '%d-%m-%Y')
@@ -118,47 +128,77 @@ def crear_ordenes(ref_data):
         var_precio_buy=var_precio_compra,
         var_precio_sell=var_precio_venta,
         volumen_base=volumen_base,
-        var_volumen=var_volumen
+        var_volumen=var_volumen,
+        ratio_rechazo=ratio_rechazo
     )
 
     ordenes, fechas, tiempos = simulador.correr_simulacion()
 
-    return [Orden(**o) for o in ordenes], crear_fechas(fechas), crear_tiempos(tiempos)
+    pbar = ProgressBar(len(ordenes), action="CONVIRTIENDO ORDENES A SQL-ALCHEMY", bar_len=50)
+    ret = []
+    for o in ordenes:
+        ret.append(Orden(**o))
+        pbar.tick()
+
+    return ret, crear_fechas(fechas), crear_tiempos(tiempos)
 
 
 def crear_fechas(fechas):
-    return [Fecha(
-        dia_epoch=f.timestamp(),
-        numero_dia=f.day,
-        nombre_dia=Dias[f.date().weekday()],
-        numero_semana=f.date().isocalendar()[1],
-        numero_mes=f.month,
-        nombre_mes=Meses[f.month],
-        año=f.year,
-        es_finde=f.date().weekday() in [5, 6],
-        es_feriado=False  # Por ahora hardcodeado falso
-    ) for f in fechas]
+    pbar = ProgressBar(len(fechas), action="CONVIRTIENDO FECHAS A SQL-ALCHEMY", bar_len=50)
+    ret = []
+    for f in fechas:
+        ret.append(
+            Fecha(
+                dia_epoch=f.timestamp(),
+                numero_dia=f.day,
+                nombre_dia=Dias[f.date().weekday()],
+                numero_semana=f.date().isocalendar()[1],
+                numero_mes=f.month,
+                nombre_mes=Meses[f.month],
+                año=f.year,
+                es_finde=f.date().weekday() in [5, 6],
+                es_feriado=False  # Por ahora hardcodeado falso
+            )
+        )
+        pbar.tick()
+
+    return ret
 
 
 def crear_tiempos(tiempos):
-    return [Tiempo(
-        nano_epoch=round(t.timestamp() * 1e9),
-        dia_epoch=t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp(),
-        nanosegundos=t.microsecond * 1000,
-        segundo=t.second,
-        minuto=t.minute,
-        hora=t.hour
-    ) for t in tiempos]
+    pbar = ProgressBar(len(tiempos), action="CONVIRTIENDO TIEMPOS A SQL-ALCHEMY", bar_len=50)
+    ret = []
+    for t in tiempos:
+        ret.append(
+            Tiempo(
+                nano_epoch=round(t.timestamp() * 1e9),
+                dia_epoch=t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp(),
+                nanosegundos=t.microsecond * 1000,
+                segundo=t.second,
+                minuto=t.minute,
+                hora=t.hour
+            )
+        )
+        pbar.tick()
+
+    return ret
 
 
 def crear_trades(ordenes, ref_data):
     hora_apertura = 8 if 'hora_apertura' not in config else config["hora_apertura"]
     hora_cierre = 17 if 'hora_cierre' not in config else config["hora_cierre"]
     instrumentos = ref_data["instrumentos"]
+    ratio_cancelacion = 0.01 if 'ratio_cancelacion' not in config else config["ratio_cancelacion"]
 
-    calculador = CalculadorTrades(instrumentos, hora_apertura, hora_cierre)
+    calculador = CalculadorTrades(instrumentos, hora_apertura, hora_cierre, ratio_cancelacion)
     trades = calculador.calcular_trades(ordenes)
-    return [Trade(**t) for t in trades]
+    pbar = ProgressBar(len(trades), action="CONVIRTIENDO TRADES A SQL-ALCHEMY", bar_len=50)
+    ret = []
+    for t in trades:
+        ret.append(Trade(**t))
+        pbar.tick()
+
+    return ret
 
 
 if __name__ == "__main__":

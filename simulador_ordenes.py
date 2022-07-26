@@ -5,6 +5,8 @@ from datetime import timedelta
 from random import randrange
 import csv
 
+from progress_bar import ProgressBar
+
 
 class SimuladorOrdenes:
 
@@ -20,7 +22,8 @@ class SimuladorOrdenes:
                  precio_base_sell,
                  var_precio_sell,
                  volumen_base,
-                 var_volumen):
+                 var_volumen,
+                 ratio_rechazo=0.02):
         self.ref_data = ref_data
         self.fecha_desde = fecha_desde
         self.fecha_hasta = fecha_hasta
@@ -33,6 +36,7 @@ class SimuladorOrdenes:
         self.var_sell = var_precio_sell
         self.vol_base = volumen_base
         self.var_vol = var_volumen
+        self.ratio_rechazo = ratio_rechazo
         self.id_actual = 1
 
     def correr_simulacion(self):
@@ -40,6 +44,8 @@ class SimuladorOrdenes:
         fecha_final = self.fecha_hasta.replace(hour=self.hora_cierre, minute=0, second=0)
         (ordenes, fechas, tiempos) = [], [], []
         cambia_dia = True
+        cant_total_horas = ((fecha_final - fecha_actual).days + 1) * (self.hora_cierre - self.hora_apertura)
+        pbar = ProgressBar(cant_total_horas, action="CALCULANDO ORDENES", bar_len=50)
         while fecha_actual < fecha_final:
             if cambia_dia:
                 fechas.append(fecha_actual.replace(hour=0, minute=0, second=0))
@@ -47,6 +53,7 @@ class SimuladorOrdenes:
             ordenes += o
             tiempos += t
             fecha_actual, cambia_dia = self.avanzar_hora(fecha_actual)
+            pbar.tick()
 
         return ordenes, fechas, tiempos
 
@@ -85,7 +92,7 @@ class SimuladorOrdenes:
                 "lado": lado,
                 "precio_stop": None,
                 "precio_limit": round(random.gauss(mu=precio_base, sigma=var_precio), 2),
-                "estado": "pendiente",
+                "estado": "pendiente" if random.uniform(0, 1) > self.ratio_rechazo else "rechazada",
                 "es_agresiva": False,
                 "cantidad_contratos": round(random.gauss(mu=self.vol_base, sigma=self.var_vol))
             }
@@ -112,6 +119,8 @@ if __name__ == "__main__":
     fecha_hasta = datetime.datetime(year=2022, month=7, day=22)
     simulador = SimuladorOrdenes(ref_data, fecha_desde, fecha_hasta, 8, 17, 100, 10, 1, 12, 1, 100, 20)
     ordenes, _, _ = simulador.correr_simulacion()
+    print("Pendientes:", len([o for o in ordenes if o["estado"] == "pendiente"]))
+    print("Rechazadas:", len([o for o in ordenes if o["estado"] == "rechazada"]))
     order_cols = list(ordenes[0].keys())
     with open('ordenes.csv', 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=order_cols)

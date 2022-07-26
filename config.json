@@ -13,5 +13,7 @@
   "precio_base_venta": 12,
   "var_precio_venta": 1,
   "volumen_base": 100,
-  "var_volumen": 20
+  "var_volumen": 20,
+  "ratio_cancelacion": 0.01,
+  "ratio_rechazo": 0.02
 }

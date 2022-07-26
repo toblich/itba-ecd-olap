@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from random import uniform
+from progress_bar import ProgressBar
 
 
 class Posicion:
@@ -44,10 +45,11 @@ class Posicion:
 
 class CalculadorTrades:
 
-    def __init__(self, instrumentos, hora_apertura, hora_cierre):
+    def __init__(self, instrumentos, hora_apertura, hora_cierre, ratio_cancelacion=0.01):
         self.instrumentos = instrumentos
         self.hora_apertura = hora_apertura
         self.hora_cierre = hora_cierre
+        self.ratio_cancelacion = ratio_cancelacion
         self.posiciones = {}
         self._inicializar_libros()
         self.id_actual = 1
@@ -61,8 +63,10 @@ class CalculadorTrades:
 
     def calcular_trades(self, ordenes):
         trades = []
-        cant_actual = dict([(o.id, o.cantidad_contratos) for o in ordenes])
-        for orden in ordenes:
+        ordenes_filtradas = [o for o in ordenes if o.estado == "pendiente"]  # Filtro órdenes rechazadas
+        cant_actual = dict([(o.id, o.cantidad_contratos) for o in ordenes_filtradas])
+        pbar = ProgressBar(len(ordenes_filtradas), action="CALCULANDO TRADES", bar_len=50)
+        for orden in ordenes_filtradas:
             es_compra = (orden.lado == "compra")
             libro = self.libros_compras[orden.ticker] if es_compra else self.libros_ventas[orden.ticker]
             libro.append(orden)
@@ -71,20 +75,28 @@ class CalculadorTrades:
             if trade is not None:
                 trades.append(trade)
 
-        # Cancelar ordenes random
-        self._cancelar_ordenes_al_azar(ordenes)
+            # Cancelar ordenes random cada 1/ratio_cancelacion rondas de ambos libros para el ticker actual (ordenes activas que no matchearon)
+            # Uso ticker y timestamp de la orden actual para cancelar las ordenes viejas (timestamp ya existe en tabla tiempo y es posterior = MESSIRVE)
+            if uniform(0, 1) < self.ratio_cancelacion:
+                self._cancelar_ordenes_al_azar(orden.ticker, orden.timestamp_creacion)
+
+            pbar.tick()
 
         return trades
 
-    def _cancelar_ordenes_al_azar(self, ordenes):
-        self._cancelar(ordenes, "pendiente", "cancelada")
-        self._cancelar(ordenes, "parcialmente ejecutada", "parcialmente cancelada")
+    def _cancelar_ordenes_al_azar(self, ticker, timestamp_cierre):
+        self._cancelar(self.libros_compras[ticker], "pendiente", "cancelada", timestamp_cierre)
+        self._cancelar(self.libros_ventas[ticker], "pendiente", "cancelada", timestamp_cierre)
+        self._cancelar(self.libros_compras[ticker], "parcialmente ejecutada", "parcialmente cancelada", timestamp_cierre)
+        self._cancelar(self.libros_ventas[ticker], "parcialmente ejecutada", "parcialmente cancelada", timestamp_cierre)
 
-    def _cancelar(self, ordenes, estado, nuevo_estado):
-        ordenes_a_cancelar = [o for o in ordenes if o.estado == estado and uniform(0, 1) < 0.1]
+    def _cancelar(self, libro, estado, nuevo_estado, timestamp):
+        # Cancelo un ratio_cancelacion % de las ordenes activas
+        ordenes_a_cancelar = [o for o in libro if o.estado == estado and uniform(0, 1) < self.ratio_cancelacion]
         for o in ordenes_a_cancelar:
             o.estado = nuevo_estado
-            o.timestamp_cierre = o.timestamp_creacion # + uniform(0, 1) * 1e11
+            o.timestamp_cierre = timestamp
+            libro.remove(o)
 
     def _procesar_trade(self, orden, es_compra, cant_actual):
         libro_compras = self.libros_compras[orden.ticker]
