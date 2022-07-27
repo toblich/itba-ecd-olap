@@ -27,9 +27,13 @@ create materialized view trades_instrumentos_fechas as (
 
 -- drop materialized view cubo_trades;
 create materialized view cubo_trades as (
-  select ticker, tipo_derivado, nombre_producto, dia_epoch, periodo_ejecucion, es_agresivo, sum(volumen_contratos) as volumen, count(id) as cantidad_trades, sum(volumen_contratos * precio_operado) / sum(volumen_contratos) as vwap, avg(precio_operado) as precio_medio
+  select ticker, tipo_derivado, nombre_producto, dia_epoch, periodo_ejecucion, es_agresivo, es_self_match,
+    sum(volumen_contratos) as volumen,
+    count(id) as cantidad_trades,
+    sum(volumen_contratos * precio_operado) / sum(volumen_contratos) as vwap,
+    avg(precio_operado) as precio_medio
   from trades_instrumentos_fechas
-  group by cube(ticker, (tipo_derivado, nombre_producto), dia_epoch, periodo_ejecucion, es_agresivo)
+  group by cube(ticker, (tipo_derivado, nombre_producto), dia_epoch, periodo_ejecucion, es_agresivo, es_self_match)
 );
 
 select * from cubo_trades;
@@ -37,6 +41,7 @@ select * from cubo_trades;
 
 
 -- ¿Qué porcentaje del volumen del día fue operado durante el período de settlement?
+-- + ¿Qué porcentaje de la cantidad de trades del día fue realizado durante el período de settlement?
 
 -- Variante 1 (sobre las tablas originales)
 with por_periodo as (
@@ -70,27 +75,42 @@ where
   and dia_epoch between 1658286000 and 1658458800
   and periodo_ejecucion is not null
   and es_agresivo is null
+  and es_self_match is null
   and tipo_derivado is null
 order by dia_epoch asc, periodo_ejecucion asc;
 
 
 --
--- ¿Qué porcentaje de la cantidad de trades del día fue realizado durante el período de settlement?
+-- ¿Qué porcentaje del volumen operado durante el período de settlement fue agresivo?
+-- En comparación, ¿Qué porcentaje del volumen operado durante todo el día fue agresivo?
 
--- Variante 1 (sobre las tablas originales)
-with cantidad_por_periodo as (
-  select periodo_ejecucion, count(id) as cantidad
-  from trades
-  join tiempo on trades.stamp = tiempo.nano_epoch
-  where ticker = 'SOY.F.12' and tiempo.dia_epoch between 1658286000 and 1658458800
-  group by periodo_ejecucion
-),
-cantidad_total as (
-  select sum(cantidad) as cantidad_total from cantidad_por_periodo
-)
-select periodo_ejecucion, cantidad, cantidad / cantidad_total * 100 as porcentaje
-from cantidad_por_periodo, cantidad_total
-;
+select ticker, dia_epoch, periodo_ejecucion, es_agresivo,
+  volumen,
+  sum(volumen) over (partition by ticker, dia_epoch) as volumen_total,
+  100 * volumen / (sum(volumen) over (partition by ticker, dia_epoch)) as porcentaje_volumen
+from cubo_trades
+where
+  ticker = 'SOY.F.12'
+  and dia_epoch between 1658286000 and 1658458800
+  and periodo_ejecucion is not null
+  and es_agresivo is not null
+  and es_self_match is null
+  and tipo_derivado is null
+order by dia_epoch asc, periodo_ejecucion asc, es_agresivo asc;
 
--- Variante 2 (sobre el cubo materializado)
-select
+--
+-- ¿Qué porcentaje del volumen operado durante el período de settlement fue self-matched?
+-- En comparación, ¿Qué porcentaje del volumen operado durante todo el día fue self-matched?
+select ticker, dia_epoch, periodo_ejecucion, es_self_match,
+  volumen,
+  sum(volumen) over (partition by ticker, dia_epoch) as volumen_total,
+  100 * volumen / (sum(volumen) over (partition by ticker, dia_epoch)) as porcentaje_volumen
+from cubo_trades
+where
+  ticker = 'SOY.F.12'
+  and dia_epoch between 1658286000 and 1658458800
+  and periodo_ejecucion is not null
+  and es_agresivo is null
+  and es_self_match is not null
+  and tipo_derivado is null
+order by dia_epoch asc, periodo_ejecucion asc, es_agresivo asc;
