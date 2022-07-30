@@ -3,11 +3,6 @@
 -- Manipulación de settlement --
 --------------------------------
 
--- drop index idx_trades_instr_fechas_dia_epoch;
--- create index if not exists idx_trades_instr_fechas_dia_epoch on trades_instrumentos_fechas (dia_epoch);
--- drop index idx_trades_instr_fechas_ticker;
--- create index if not exists idx_trades_instr_fechas_ticker on trades_instrumentos_fechas using hash (ticker);
-
 -- ¿Qué porcentaje del volumen del día fue operado durante el período de settlement?
 -- + ¿Qué porcentaje de la cantidad de trades del día fue realizado durante el período de settlement?
 
@@ -114,7 +109,7 @@ WHERE
 	t.ticker IS NOT NULL
 	AND t.id_cuenta IS NOT NULL
 	AND t.minuto IS NOT NULL
-order by porcentaje_cancelacion desc
+order by porcentaje_cancelacion desc;
 
 -- Ej 2: Por hora, tipo_derivado y firma
 SELECT 	t.año, t.numero_mes, t.numero_dia, t.hora, t.nombre_producto, t.tipo_derivado, t.id_firma, t.firma,
@@ -144,7 +139,7 @@ WHERE
 	AND t.tipo_derivado IS NOT NULL
 	AND t.id_firma IS NOT NULL
 	AND t.hora IS NOT NULL
-order by porcentaje_cancelacion desc
+order by porcentaje_cancelacion desc;
 
 -- ¿Cuántos trades hizo un participante en un sentido determinado (compra/venta), luego de una cancelación de órdenes en el sentido contrario? 
 -- ¿Cuál es el volumen total operado en éstos trades?
@@ -173,13 +168,17 @@ FROM
 		AND (oc.id_operador IS NULL) -- Agregación por operador de órdenes canceladas
 		AND (oc.lado IS NOT NULL) -- No agrego el subtotal por lado
 	)
+WHERE
+	t.ticker IS NOT NULL
+	AND t.id_cuenta IS NOT NULL
+	AND t.minuto IS NOT NULL
 GROUP BY
 	t.año, t.numero_mes, t.numero_dia, t.hora, t.minuto, t.ticker, t.id_firma, t.firma, t.id_cuenta, t.cuenta
-order by cantidad_trades_luego_cancelacion desc, volumen_trades_luego_cancelacion desc
+order by cantidad_trades_luego_cancelacion desc, volumen_trades_luego_cancelacion desc;
 
---------------------------------
+-----------------------------------
 ----------- Wash Trades -----------
---------------------------------
+-----------------------------------
 --¿Cuántos trades fueron realizados entre participantes de la misma firma? 
 --¿Qué volumen total se operó en éstos trades? 
 
@@ -190,4 +189,4 @@ select año, numero_mes, numero_dia, ticker
 from trades_base
 where id_firma_comprador = id_firma_vendedor
 group by rollup(año,numero_mes,numero_dia),rollup(ticker), id_firma_comprador
-order by 1,2,3,4,5
+order by 1,2,3,4,5;

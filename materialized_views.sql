@@ -51,9 +51,9 @@ create materialized view ordenes_base as (
 			f.nombre as nombre_firma
   from ordenes o
   join tiempo tcreacion on o.timestamp_creacion = tcreacion.nano_epoch
-  join tiempo tcierre on o.timestamp_cierre = tcierre.nano_epoch
+  left join tiempo tcierre on o.timestamp_cierre = tcierre.nano_epoch
   join fechas fcreacion on tcreacion.dia_epoch = fcreacion.dia_epoch
-  join fechas fcierre on tcierre.dia_epoch = fcierre.dia_epoch
+  left join fechas fcierre on tcierre.dia_epoch = fcierre.dia_epoch
   join instrumentos i on o.ticker = i.ticker
   join cuentas c on c.id = o.id_cuenta
   join operadores op on op.id = o.id_operador
