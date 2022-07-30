@@ -47,6 +47,19 @@ python3 seed.py
 
 ### Datos fijos: Cuentas, Firmas, Brokers, Operadores e Instrumentos
 
-En el archivo "ref_data.json" se encuentran valores fijos para éstas entidades. 
+En el archivo "ref_data.json" se encuentran valores fijos para éstas entidades.
 El contenido puede ser modificado libremente para generar órdenes y trades para otros
 participantes e instrumentos.
+
+## Crear vistas materializadas
+
+Ejecutar el script `materialized_views.sql` sobre el DW.
+
+```sh
+psql -d dw < materialized_views.sql
+```
+
+## Consultas
+
+El archivo `queries.sql` contiene varias de las consultas puestas como objetivos de este trabajo. En particular,
+se centra en los fraudes de Settlement Manipulation, Spoofing, y Wash Trades.
