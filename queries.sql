@@ -177,3 +177,28 @@ GROUP BY
 	t.año, t.numero_mes, t.numero_dia, t.hora, t.minuto, t.ticker, t.id_firma, t.firma, t.id_cuenta, t.cuenta
 order by cantidad_trades_luego_cancelacion desc, volumen_trades_luego_cancelacion desc
 
+--------------------------------
+----------- Wash Trades -----------
+--------------------------------
+--¿Cuántos trades fueron realizados entre participantes de la misma firma? 
+--¿Qué volumen total se operó en éstos trades? 
+
+select f.año,f.numero_mes,f.numero_dia,tr.ticker
+,cv.id_firma,count(*) as cantidad_trades_misma_firma
+,sum(volumen_contratos) as volumen
+from trades tr
+inner join ordenes oc
+on oc.id=tr.id_orden_compra
+inner join cuentas cc
+on oc.id_cuenta=cc.id
+inner join ordenes ov
+on ov.id=tr.id_orden_venta
+inner join cuentas cv
+on ov.id_cuenta=cv.id
+join tiempo ti
+on tr.stamp=ti.nano_epoch
+join fechas f
+on ti.dia_epoch=f.dia_epoch
+where cv.id_firma=cc.id_firma
+group by rollup(f.año,f.numero_mes,f.numero_dia),rollup(tr.ticker), cv.id_firma
+order by 1,2,3,4,5
