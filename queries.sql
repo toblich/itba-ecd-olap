@@ -1,44 +1,12 @@
-select * from trades limit 5;
-
-select * from fechas;
-
-select * from trades_instrumentos_fechas limit 5;
 
 --------------------------------
 -- Manipulación de settlement --
 --------------------------------
 
--- drop materialized view trades_instrumentos_fechas;
-create materialized view trades_instrumentos_fechas as (
-  select
-    trades.id, trades.precio_operado, trades.volumen_contratos, trades.es_agresivo, trades.es_self_match,
-    trades.periodo_ejecucion, trades.ganancia_comprador, trades.ganancia_vendedor, trades.periodo_ejecucion = 'settlement' as es_settlement,
-    fechas.*, instrumentos.*
-  from trades
-  join tiempo on trades.stamp = tiempo.nano_epoch
-  join fechas on tiempo.dia_epoch = fechas.dia_epoch
-  join instrumentos on trades.ticker = instrumentos.ticker
-);
-
 -- drop index idx_trades_instr_fechas_dia_epoch;
 -- create index if not exists idx_trades_instr_fechas_dia_epoch on trades_instrumentos_fechas (dia_epoch);
 -- drop index idx_trades_instr_fechas_ticker;
 -- create index if not exists idx_trades_instr_fechas_ticker on trades_instrumentos_fechas using hash (ticker);
-
--- drop materialized view cubo_trades;
-create materialized view cubo_trades as (
-  select ticker, tipo_derivado, nombre_producto, dia_epoch, periodo_ejecucion, es_agresivo, es_self_match,
-    sum(volumen_contratos) as volumen,
-    count(id) as cantidad_trades,
-    sum(volumen_contratos * precio_operado) / sum(volumen_contratos) as vwap,
-    avg(precio_operado) as precio_medio
-  from trades_instrumentos_fechas
-  group by cube(ticker, (tipo_derivado, nombre_producto), dia_epoch, periodo_ejecucion, es_agresivo, es_self_match)
-);
-
-select * from cubo_trades;
-
-
 
 -- ¿Qué porcentaje del volumen del día fue operado durante el período de settlement?
 -- + ¿Qué porcentaje de la cantidad de trades del día fue realizado durante el período de settlement?
@@ -59,8 +27,7 @@ select ticker, total.dia_epoch, periodo_ejecucion, volumen, volumen_total, canti
   cantidad_trades / cantidad_trades_total * 100 as porcentaje_cantidad
 from por_periodo
 join total on por_periodo.dia_epoch = total.dia_epoch
-order by dia_epoch asc, periodo_ejecucion asc
-;
+order by dia_epoch asc, periodo_ejecucion asc;
 
 -- Variante 2 (sobre el cubo como vista materializada)
 select ticker, dia_epoch, periodo_ejecucion, volumen,
@@ -69,7 +36,7 @@ select ticker, dia_epoch, periodo_ejecucion, volumen,
   sum(cantidad_trades) over (partition by ticker, dia_epoch) as cantidad_trades_total,
   volumen / (sum(volumen) over (partition by ticker, dia_epoch)) * 100 as porcentaje_volumen,
   cantidad_trades / (sum(cantidad_trades) over (partition by ticker, dia_epoch)) * 100 as porcentaje_cantidad
-from cubo_trades
+from settlement_cubo_trades
 where
   ticker = 'SOY.F.12'
   and dia_epoch between 1658286000 and 1658458800
@@ -88,7 +55,7 @@ select ticker, dia_epoch, periodo_ejecucion, es_agresivo,
   volumen,
   sum(volumen) over (partition by ticker, dia_epoch) as volumen_total,
   100 * volumen / (sum(volumen) over (partition by ticker, dia_epoch)) as porcentaje_volumen
-from cubo_trades
+from settlement_cubo_trades
 where
   ticker = 'SOY.F.12'
   and dia_epoch between 1658286000 and 1658458800
@@ -105,7 +72,7 @@ select ticker, dia_epoch, periodo_ejecucion, es_self_match,
   volumen,
   sum(volumen) over (partition by ticker, dia_epoch) as volumen_total,
   100 * volumen / (sum(volumen) over (partition by ticker, dia_epoch)) as porcentaje_volumen
-from cubo_trades
+from settlement_cubo_trades
 where
   ticker = 'SOY.F.12'
   and dia_epoch between 1658286000 and 1658458800
@@ -113,4 +80,100 @@ where
   and es_agresivo is null
   and es_self_match is not null
   and tipo_derivado is null
-order by dia_epoch asc, periodo_ejecucion asc, es_agresivo asc;
+order by dia_epoch asc, periodo_ejecucion asc, es_self_match asc;
+
+--------------------------------
+-- 		    Spoofing          --
+--------------------------------
+
+-- Para un instrumento (contrato), derivado o producto, y un rango de días determinado, 
+-- agregando por mes, día, hora, minuto y por firma, cuenta u operador:
+
+-- ¿Cuál es el porcentaje de órdenes canceladas sobre trades de ese participante?
+
+-- Ej 1: Por minuto, ticker y cuenta
+SELECT 	t.año, t.numero_mes, t.numero_dia, t.hora, t.minuto, t.ticker,
+		t.id_firma, t.firma, t.id_cuenta, t.cuenta,
+		oc.cantidad as cantidad_cancelaciones,
+		t.cantidad as cantidad_trades,
+		CASE WHEN oc.cantidad IS NOT NULL THEN (oc.cantidad / t.cantidad) * 100 ELSE 0 END as porcentaje_cancelacion
+FROM
+	spoofing_trades_participante t
+	LEFT JOIN cubo_ordenes_canceladas oc ON (
+		(oc.cierre_minuto = t.minuto)
+		AND (oc.cierre_hora = t.hora)
+		AND (oc.cierre_numero_dia = t.numero_dia)
+		AND (oc.cierre_numero_mes = t.numero_mes)
+		AND (oc.cierre_año = t.año)
+		AND (oc.ticker = t.ticker)
+		AND (oc.id_cuenta = t.id_cuenta)
+		AND (oc.id_operador IS NULL) -- Agregación por operador de órdenes canceladas
+		AND (oc.lado IS NULL) -- Agregación por lado
+	)
+WHERE
+	t.ticker IS NOT NULL
+	AND t.id_cuenta IS NOT NULL
+	AND t.minuto IS NOT NULL
+order by porcentaje_cancelacion desc
+
+-- Ej 2: Por hora, tipo_derivado y firma
+SELECT 	t.año, t.numero_mes, t.numero_dia, t.hora, t.nombre_producto, t.tipo_derivado, t.id_firma, t.firma,
+		oc.cantidad as cantidad_cancelaciones,
+		t.cantidad as cantidad_trades,
+		CASE WHEN oc.cantidad IS NOT NULL THEN (oc.cantidad / t.cantidad) * 100 ELSE 0 END as porcentaje_cancelacion
+FROM
+	spoofing_trades_participante t
+	LEFT JOIN cubo_ordenes_canceladas oc ON (
+		(oc.cierre_minuto IS NULL AND t.minuto IS NULL) -- Agregado por minuto
+		AND (oc.cierre_hora = t.hora)
+		AND (oc.cierre_numero_dia = t.numero_dia)
+		AND (oc.cierre_numero_mes = t.numero_mes)
+		AND (oc.cierre_año = t.año)
+		AND (oc.ticker IS NULL AND t.ticker IS NULL) -- Agregado por ticket
+		AND (oc.precio_ejercicio IS NULL AND t.precio_ejercicio IS NULL) -- Agregado por precio_ejercicio
+		AND (oc.vencimiento IS NULL AND t.vencimiento IS NULL) -- Agregado por vencimiento
+		AND (oc.tipo_derivado = t.tipo_derivado)
+		AND (oc.nombre_producto = t.nombre_producto)
+		AND (oc.id_cuenta IS NULL AND t.id_cuenta IS NULL) -- Agregado por cuenta
+		AND (oc.id_firma = t.id_firma)
+		AND (oc.id_operador IS NULL) -- Agregación por operador de órdenes canceladas
+		AND (oc.lado IS NULL) -- Agregación por lado
+	)
+WHERE
+	t.nombre_producto IS NOT NULL
+	AND t.tipo_derivado IS NOT NULL
+	AND t.id_firma IS NOT NULL
+	AND t.hora IS NOT NULL
+order by porcentaje_cancelacion desc
+
+-- ¿Cuántos trades hizo un participante en un sentido determinado (compra/venta), luego de una cancelación de órdenes en el sentido contrario? 
+-- ¿Cuál es el volumen total operado en éstos trades?
+
+-- Ej 1: Por minuto, ticker y cuenta
+SELECT 	t.año, t.numero_mes, t.numero_dia, t.hora, t.minuto, t.ticker,
+		t.id_firma, t.firma, t.id_cuenta, t.cuenta,
+		SUM(CASE WHEN (
+			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'venta'))
+			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'compra'))
+			) THEN t.cantidad ELSE 0 END) AS cantidad_trades_luego_cancelacion,
+		SUM(CASE WHEN (
+			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'venta'))
+			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'compra'))
+			) THEN t.volumen ELSE 0 END) AS volumen_trades_luego_cancelacion
+FROM
+	spoofing_trades_participante t
+	LEFT JOIN cubo_ordenes_canceladas oc ON (
+		(oc.cierre_minuto = t.minuto)
+		AND (oc.cierre_hora = t.hora)
+		AND (oc.cierre_numero_dia = t.numero_dia)
+		AND (oc.cierre_numero_mes = t.numero_mes)
+		AND (oc.cierre_año = t.año)
+		AND (oc.ticker = t.ticker)
+		AND (oc.id_cuenta = t.id_cuenta)
+		AND (oc.id_operador IS NULL) -- Agregación por operador de órdenes canceladas
+		AND (oc.lado IS NOT NULL) -- No agrego el subtotal por lado
+	)
+GROUP BY
+	t.año, t.numero_mes, t.numero_dia, t.hora, t.minuto, t.ticker, t.id_firma, t.firma, t.id_cuenta, t.cuenta
+order by cantidad_trades_luego_cancelacion desc, volumen_trades_luego_cancelacion desc
+

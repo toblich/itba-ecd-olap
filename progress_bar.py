@@ -11,28 +11,27 @@ class ProgressBar:
         self.current_perc = 0
         self.last_round_perc = 0
         self.prev_stamp = None
-        self.time_steps = []
+        # self.time_steps = []
 
     def tick(self):
         # First empty bar
         if self.current_step == 0:
             self.print_progress()
+            self.prev_stamp = datetime.datetime.now()
 
         self.current_step += 1
         self.current_perc = self.current_step / self.total_items * 100
         if (round(self.current_perc) > self.last_round_perc) and (self.current_perc <= 100) and self.current_step > 1:
             self.last_round_perc = round(self.current_perc)
             self.print_progress()
-
-        self.prev_stamp = datetime.datetime.now()
+            self.prev_stamp = datetime.datetime.now()
 
     def print_progress(self):
         remaining_time = "Inf"
         if self.current_step > 0:
             time_step = datetime.datetime.now() - self.prev_stamp
-            self.time_steps.append(time_step)
-            avg_time_step = sum(self.time_steps, datetime.timedelta()) / len(self.time_steps)
-            remaining_time = avg_time_step * (self.total_items - self.current_step)
+            # avg_time_step = sum(self.time_steps, datetime.timedelta()) / len(self.time_steps)
+            remaining_time = time_step * (100 - self.current_perc)
 
         filled_len = int(round(self.bar_len * self.last_round_perc / 100.0))
 

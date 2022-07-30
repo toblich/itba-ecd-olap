@@ -5,9 +5,12 @@ from progress_bar import ProgressBar
 
 class Posicion:
 
-    def __init__(self):
-        self.detalle_pos = []
-        self.pos = 0
+    def __init__(self, detalle_pos=None, pos=0):
+        if detalle_pos is None:
+            detalle_pos = []
+
+        self.detalle_pos = detalle_pos
+        self.pos = pos
 
     def computar_trade(self, precio, volumen, lado):
         if (lado == "compra" and self.pos >= 0) or (lado == "venta" and self.pos <= 0):
@@ -87,7 +90,8 @@ class CalculadorTrades:
     def _cancelar_ordenes_al_azar(self, ticker, timestamp_cierre):
         self._cancelar(self.libros_compras[ticker], "pendiente", "cancelada", timestamp_cierre)
         self._cancelar(self.libros_ventas[ticker], "pendiente", "cancelada", timestamp_cierre)
-        self._cancelar(self.libros_compras[ticker], "parcialmente ejecutada", "parcialmente cancelada", timestamp_cierre)
+        self._cancelar(self.libros_compras[ticker], "parcialmente ejecutada", "parcialmente cancelada",
+                       timestamp_cierre)
         self._cancelar(self.libros_ventas[ticker], "parcialmente ejecutada", "parcialmente cancelada", timestamp_cierre)
 
     def _cancelar(self, libro, estado, nuevo_estado, timestamp):
@@ -117,7 +121,8 @@ class CalculadorTrades:
         es_agresivo = mejor_compra.precio_limit > mejor_venta.precio_limit  # Si son iguales es a valor de mercado, no agresivo
         volumen_trade = min(cant_actual[mejor_compra.id], cant_actual[mejor_venta.id])
 
-        ganancia_compra, ganancia_venta = self._calcular_ganancias(mejor_compra, mejor_venta, precio_trade, volumen_trade)
+        ganancia_compra, ganancia_venta = self._calcular_ganancias(mejor_compra, mejor_venta, precio_trade,
+                                                                   volumen_trade)
 
         trade = {
             "id": self.id_actual,
@@ -134,11 +139,13 @@ class CalculadorTrades:
             "ganancia_vendedor": ganancia_venta
         }
 
-        compra_totalmente_ejec = self._actualizar_orden(mejor_compra, (es_agresivo and es_compra), volumen_trade, cant_actual, trade["stamp"])
+        compra_totalmente_ejec = self._actualizar_orden(mejor_compra, (es_agresivo and es_compra), volumen_trade,
+                                                        cant_actual, trade["stamp"])
         if compra_totalmente_ejec:
             libro_compras.pop()
 
-        venta_totalmente_ejec = self._actualizar_orden(mejor_venta, (es_agresivo and not es_compra), volumen_trade, cant_actual, trade["stamp"])
+        venta_totalmente_ejec = self._actualizar_orden(mejor_venta, (es_agresivo and not es_compra), volumen_trade,
+                                                       cant_actual, trade["stamp"])
         if venta_totalmente_ejec:
             libro_ventas.pop()
 
@@ -156,6 +163,10 @@ class CalculadorTrades:
         # Posicion compra y venta
         pos_compra = self._obtener_posicion(mejor_compra)
         pos_venta = self._obtener_posicion(mejor_venta)
+
+        # Self match devuelve ganancia 0 y no modifica la posición anterior
+        if pos_compra == pos_venta:
+            return 0, 0
 
         # Actualizar posiciones y calcular ganancias
         ganancia_compra = pos_compra.computar_trade(precio_trade, volumen_trade, "compra")
