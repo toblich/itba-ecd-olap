@@ -51,6 +51,20 @@ En el archivo "ref_data.json" se encuentran valores fijos para éstas entidades.
 El contenido puede ser modificado libremente para generar órdenes y trades para otros
 participantes e instrumentos.
 
+## Crear índices por FK
+
+Los índices por FK sirven para acelerar los DELETE sobre todas las tablas (primer paso de seed.py), en el caso de volver
+a correr la simulación, si se está usando un gran número de órdenes generadas por hora. 
+
+Aparentemente los delete on cascade son muy lentos al tener millones de rows. Ésta solución demostró acelerar éste paso
+en varios órdenes de magnitud.
+
+Ejecutar el script `indices.sql` sobre el DW.
+
+```sh
+psql -d dw < indices.sql
+```
+
 ## Crear vistas materializadas
 
 Ejecutar el script `materialized_views.sql` sobre el DW.

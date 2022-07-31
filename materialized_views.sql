@@ -198,12 +198,16 @@ create materialized view spoofing_trades_participante as (
 				t.id_firma_comprador as id_firma, t.firma_comprador as firma,
 				t.id_cuenta_comprador as id_cuenta, t.cuenta_comprador as cuenta,
 				t.id_operador_comprador as id_operador, t.operador_comprador as operador,
-				t.volumen, t.cantidad, t.primer_trade, t.ultimo_trade, 'compra' as lado
+				SUM(t.volumen) as volumen, SUM(t.cantidad) as cantidad, MIN(t.primer_trade) as primer_trade, MAX(t.ultimo_trade) as ultimo_trade,
+				'compra' as lado
 		from 
 			cubo_trades_tiempo_instrumento t
 		where
 			t.es_agresivo IS NULL -- Agregación por agresivo
-			AND t.es_self_match IS NULL -- Agregación por self-match
+			AND t.es_self_match IS NULL -- Agregación por self-match. De un lado cuantifico todos los trades.
+		GROUP BY
+			t.minuto, t.hora, t.numero_dia, t.numero_mes, t.año, t.ticker, t.precio_ejercicio, t.vencimiento, t.tipo_derivado, t.nombre_producto,
+			t.id_firma_comprador, t.firma_comprador, t.id_cuenta_comprador, t.cuenta_comprador, t.id_operador_comprador, t.operador_comprador
 		UNION
 		-- LADO VENTA
 		select 	t.minuto, t.hora, t.numero_dia, t.numero_mes, t.año,
@@ -211,41 +215,29 @@ create materialized view spoofing_trades_participante as (
 				t.id_firma_vendedor as id_firma, t.firma_vendedor as firma,
 				t.id_cuenta_vendedor as id_cuenta, t.cuenta_vendedor as cuenta,
 				t.id_operador_vendedor as id_operador, t.operador_vendedor as operador,
-				t.volumen, t.cantidad, t.primer_trade, t.ultimo_trade, 'venta' as lado
+				SUM(t.volumen) as volumen, SUM(t.cantidad) as cantidad, MIN(t.primer_trade) as primer_trade, MAX(t.ultimo_trade) as ultimo_trade,
+				'venta' as lado
 		from 
 			cubo_trades_tiempo_instrumento t
 		where
 			t.es_agresivo IS NULL -- Agregación por agresivo
-			AND t.es_self_match IS NULL -- Agregación por self-match
-	), trades_sin_duplicados AS (
-		select 	t.minuto, t.hora, t.numero_dia, t.numero_mes, t.año,
-				t.ticker, t.precio_ejercicio, t.vencimiento, t.tipo_derivado, t.nombre_producto,
-				t.id_firma, t.firma, t.id_cuenta, t.cuenta, t.id_operador, t.operador,
-				MAX(t.volumen) as volumen, 
-				MAX(t.cantidad) as cantidad,
-				-- 9,223,372,036,854,775,807 es MAX BIGINT
-				MIN(CASE WHEN(lado = 'compra') THEN t.primer_trade ELSE 9223372036854775807 END) as primer_trade_compra,
-				MIN(CASE WHEN(lado = 'venta') THEN t.primer_trade ELSE 9223372036854775807 END) as primer_trade_venta,
-				MAX(CASE WHEN(lado = 'compra') THEN t.ultimo_trade ELSE 0 END) as ultimo_trade_compra,
-				MAX(CASE WHEN(lado = 'venta') THEN t.ultimo_trade ELSE 0 END) as ultimo_trade_venta
-		from 
-			trades_participante t
+			AND t.es_self_match = FALSE -- Agrego solo las NO self-matched. Esto es para evitar un doble conteo en las que el mismo participante esta a ambos lados.
 		GROUP BY
-			t.minuto, t.hora, t.numero_dia, t.numero_mes, t.año,
-			t.ticker, t.precio_ejercicio, t.vencimiento, t.tipo_derivado, t.nombre_producto,
-			t.id_firma, t.firma, t.id_cuenta, t.cuenta, t.id_operador, t.operador
+			t.minuto, t.hora, t.numero_dia, t.numero_mes, t.año, t.ticker, t.precio_ejercicio, t.vencimiento, t.tipo_derivado, t.nombre_producto,
+			t.id_firma_vendedor, t.firma_vendedor, t.id_cuenta_vendedor, t.cuenta_vendedor, t.id_operador_vendedor, t.operador_vendedor
 	)
 	SELECT 	t.minuto, t.hora, t.numero_dia, t.numero_mes, t.año,
 			t.ticker, t.precio_ejercicio, t.vencimiento, t.tipo_derivado, t.nombre_producto,
 			t.id_firma, t.firma, t.id_cuenta, t.cuenta, t.id_operador, t.operador, 
-			sum(volumen) as volumen,
-			sum(cantidad) as cantidad,
-			MIN(t.primer_trade_compra) as primer_trade_compra, 
-			MAX(t.ultimo_trade_compra) as ultimo_trade_compra,
-			MIN(t.primer_trade_venta) as primer_trade_venta, 
-			MAX(t.ultimo_trade_venta) as ultimo_trade_venta
+			SUM(volumen) as volumen,
+			SUM(cantidad) as cantidad,
+			-- 9,223,372,036,854,775,807 es MAX BIGINT
+			MIN(CASE WHEN (lado = 'compra') THEN t.primer_trade ELSE 9223372036854775807 END) as primer_trade_compra, 
+			MAX(CASE WHEN (lado = 'compra') THEN t.ultimo_trade ELSE 0 END) as ultimo_trade_compra,
+			MIN(CASE WHEN (lado = 'venta') THEN t.primer_trade ELSE 9223372036854775807 END) as primer_trade_venta, 
+			MAX(CASE WHEN (lado = 'venta') THEN t.ultimo_trade ELSE 0 END) as ultimo_trade_venta
 	FROM
-		trades_sin_duplicados t
+		trades_participante t
 	GROUP BY
 		t.minuto, t.hora, t.numero_dia, t.numero_mes, t.año,
 		t.ticker, t.precio_ejercicio, t.vencimiento, t.tipo_derivado, t.nombre_producto,

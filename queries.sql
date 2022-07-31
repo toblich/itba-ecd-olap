@@ -148,13 +148,13 @@ order by porcentaje_cancelacion desc;
 SELECT 	t.año, t.numero_mes, t.numero_dia, t.hora, t.minuto, t.ticker,
 		t.id_firma, t.firma, t.id_cuenta, t.cuenta,
 		SUM(CASE WHEN (
-			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'venta'))
-			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'compra'))
-			) THEN t.cantidad ELSE 0 END) AS cantidad_trades_luego_cancelacion,
+			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'compra'))
+			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'venta'))
+			) THEN t.cantidad ELSE 0 END) AS cantidad_trades_luego_cancelacion, -- Trades de un lado luego de cancelacion en lado opuesto
 		SUM(CASE WHEN (
-			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'venta'))
-			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'compra'))
-			) THEN t.volumen ELSE 0 END) AS volumen_trades_luego_cancelacion
+			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'compra'))
+			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'venta'))
+			) THEN t.volumen ELSE 0 END) AS volumen_trades_luego_cancelacion -- Trades de un lado luego de cancelacion en lado opuesto
 FROM
 	spoofing_trades_participante t
 	LEFT JOIN cubo_ordenes_canceladas oc ON (
@@ -166,7 +166,7 @@ FROM
 		AND (oc.ticker = t.ticker)
 		AND (oc.id_cuenta = t.id_cuenta)
 		AND (oc.id_operador IS NULL) -- Agregación por operador de órdenes canceladas
-		AND (oc.lado IS NOT NULL) -- No agrego el subtotal por lado
+		AND (oc.lado IS NOT NULL) -- No agrego el subtotal por lado! Lo necesito para determinar el spoofing
 	)
 WHERE
 	t.ticker IS NOT NULL
@@ -174,6 +174,43 @@ WHERE
 	AND t.minuto IS NOT NULL
 GROUP BY
 	t.año, t.numero_mes, t.numero_dia, t.hora, t.minuto, t.ticker, t.id_firma, t.firma, t.id_cuenta, t.cuenta
+order by cantidad_trades_luego_cancelacion desc, volumen_trades_luego_cancelacion desc;
+
+-- Ej 2: Por hora, tipo_derivado y firma
+SELECT 	t.año, t.numero_mes, t.numero_dia, t.hora, t.nombre_producto, t.tipo_derivado, t.id_firma, t.firma,
+		SUM(CASE WHEN (
+			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'compra'))
+			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'venta'))
+			) THEN t.cantidad ELSE 0 END) AS cantidad_trades_luego_cancelacion, -- Trades de un lado luego de cancelacion en lado opuesto
+		SUM(CASE WHEN (
+			((t.ultimo_trade_venta > oc.primera_cancelacion) AND (oc.lado = 'compra'))
+			OR ((t.ultimo_trade_compra > oc.primera_cancelacion) AND (oc.lado = 'venta'))
+			) THEN t.volumen ELSE 0 END) AS volumen_trades_luego_cancelacion -- Trades de un lado luego de cancelacion en lado opuesto
+FROM
+	spoofing_trades_participante t
+	LEFT JOIN cubo_ordenes_canceladas oc ON (
+		(oc.cierre_minuto IS NULL AND t.minuto IS NULL) -- Agregado por minuto
+		AND (oc.cierre_hora = t.hora)
+		AND (oc.cierre_numero_dia = t.numero_dia)
+		AND (oc.cierre_numero_mes = t.numero_mes)
+		AND (oc.cierre_año = t.año)
+		AND (oc.ticker IS NULL AND t.ticker IS NULL) -- Agregado por ticket
+		AND (oc.precio_ejercicio IS NULL AND t.precio_ejercicio IS NULL) -- Agregado por precio_ejercicio
+		AND (oc.vencimiento IS NULL AND t.vencimiento IS NULL) -- Agregado por vencimiento
+		AND (oc.tipo_derivado = t.tipo_derivado)
+		AND (oc.nombre_producto = t.nombre_producto)
+		AND (oc.id_cuenta IS NULL AND t.id_cuenta IS NULL) -- Agregado por cuenta
+		AND (oc.id_firma = t.id_firma)
+		AND (oc.id_operador IS NULL) -- Agregación por operador de órdenes canceladas
+		AND (oc.lado IS NOT NULL) -- No agrego el subtotal por lado! Lo necesito para determinar el spoofing
+	)
+WHERE
+	t.nombre_producto IS NOT NULL
+	AND t.tipo_derivado IS NOT NULL
+	AND t.id_firma IS NOT NULL
+	AND t.hora IS NOT NULL
+GROUP BY
+	t.año, t.numero_mes, t.numero_dia, t.hora, t.nombre_producto, t.tipo_derivado, t.id_firma, t.firma
 order by cantidad_trades_luego_cancelacion desc, volumen_trades_luego_cancelacion desc;
 
 -----------------------------------
